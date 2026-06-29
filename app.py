@@ -59,3 +59,68 @@ with col_status:
     else:
         st.error("❌ PROTOCOLO RECUSADO: Pontuação inferior a 80.")
         st.warning("Nenhum mercado identificado apresenta vantagem estatística suficiente. A melhor decisão é não apostar.")
+        # --- INÍCIO DA FASE 2 ---
+
+# 6. Módulo de EV e Kelly (Só renderiza se o Score aprovar)
+if hedge_x_score >= 80:
+    st.divider()
+    st.header("Calculadora de Valor Esperado (EV+) e Kelly")
+    st.info("Insira as cotações oferecidas pelo mercado e a probabilidade real que você estimou na Etapa 5 e 6.")
+
+    # Entradas de Dados
+    col_odd, col_prob = st.columns(2)
+
+    with col_odd:
+        odd_mercado = st.number_input("Odd do Mercado (Decimal)", min_value=1.01, value=2.15, step=0.01)
+    
+    with col_prob:
+        prob_estimada_pct = st.number_input("Sua Probabilidade Estimada (%)", min_value=1.0, max_value=100.0, value=57.0, step=1.0)
+        
+    # Variáveis Matemáticas
+    prob_estimada = prob_estimada_pct / 100
+    prob_implicita = 1 / odd_mercado
+    
+    # Cálculo do EV
+    ev_percentual = (prob_estimada * odd_mercado - 1) * 100
+    
+    # Cálculo do Critério de Kelly
+    b = odd_mercado - 1
+    p = prob_estimada
+    q = 1 - p
+    
+    if b > 0:
+        full_kelly = ((p * b) - q) / b
+        # Adotamos o Quarter Kelly (1/4) por padrão de segurança
+        quarter_kelly = full_kelly / 4 
+    else:
+        full_kelly = 0
+        quarter_kelly = 0
+
+    st.subheader("Análise Quantitativa do Mercado")
+    
+    # Painel de Resultados usando Nativos
+    res1, res2, res3 = st.columns(3)
+    
+    with res1:
+        st.metric(label="Prob. Implícita da Casa", value=f"{prob_implicita * 100:.1f}%")
+        
+    with res2:
+        # Usamos o delta nativo do st.metric para mostrar se o EV é positivo (verde) ou negativo (vermelho)
+        st.metric(
+            label="Expected Value (EV)", 
+            value=f"{ev_percentual:.2f}%", 
+            delta=f"{ev_percentual:.2f}%", 
+            delta_color="normal" if ev_percentual > 0 else "inverse"
+        )
+        
+    with res3:
+        if full_kelly > 0:
+            st.metric(label="Quarter Kelly (Stake Sugerida)", value=f"{quarter_kelly * 100:.2f}%")
+        else:
+            st.metric(label="Quarter Kelly (Stake Sugerida)", value="0.00%")
+    
+    # Filtro de Qualidade Final (Etapa 9 e 10)
+    if ev_percentual > 0:
+        st.success("🎯 ENTRADA APROVADA: O mercado apresenta EV positivo. Siga a gestão do Quarter Kelly indicada.")
+    else:
+        st.warning("⚠️ ENTRADA RECUSADA: O mercado possui EV negativo (vantagem da casa). Aborte a operação e busque outras linhas.")
